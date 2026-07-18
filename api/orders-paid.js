@@ -6,9 +6,6 @@
 const crypto = require('crypto');
 const capi = require('./_lib/meta-capi');
 
-// Turn off Vercel's automatic JSON parsing so we can read the raw bytes.
-module.exports.config = { api: { bodyParser: false } };
-
 function readRaw(req) {
   return new Promise((resolve, reject) => {
     let data = '';
@@ -33,8 +30,8 @@ module.exports = async (req, res) => {
     crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(sig));
   if (!ok) return res.status(401).json({ error: 'bad hmac' });
 
-  res.status(200).json({ ok: true }); // ack Shopify immediately
-
+  // Do NOT ack before the Meta call — on Vercel the function freezes right after
+  // the response and the fetch never fires. Send to Meta first, then respond.
   try {
     const o = JSON.parse(raw);
     const ship = o.shipping_address || o.billing_address || {};
@@ -68,8 +65,12 @@ module.exports = async (req, res) => {
         clientUserAgent: clientDetails.user_agent,
       },
     });
+    return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[orders-paid]', err.message);
+    // Non-2xx makes Shopify retry later; the shared event_id means a retry
+    // can't double-count, so this recovers transient failures safely.
+    return res.status(500).json({ ok: false });
   }
 };
 
@@ -78,3 +79,7 @@ function attr(order, key) {
   const a = (order.note_attributes || []).find((x) => x.name === key);
   return a ? a.value : undefined;
 }
+
+// Tell Vercel NOT to pre-parse the body, so readRaw() gets the exact bytes
+// Shopify signed. (Set after the handler export so it isn't overwritten.)
+module.exports.config = { api: { bodyParser: false } };
