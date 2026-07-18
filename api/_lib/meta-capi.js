@@ -57,11 +57,21 @@ async function sendEvent(e) {
   if (TEST_EVENT_CODE) payload.test_event_code = TEST_EVENT_CODE;
 
   const url = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+
+  // Bound the request so we never exceed Shopify's ~5s webhook timeout.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number(process.env.CAPI_TIMEOUT_MS || 4500));
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`CAPI ${res.status}: ${JSON.stringify(json)}`);
   return json;
