@@ -2,15 +2,18 @@
    Same event_id the Pixel used, so Meta deduplicates. */
 const capi = require('./_lib/meta-capi');
 
-const ALLOWED = (process.env.ALLOWED_ORIGIN || '').split(',').filter(Boolean);
-
 function cors(req, res) {
-  const origin = req.headers.origin;
-  if (ALLOWED.length === 0 || ALLOWED.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
-  }
+  // Public, cookie-less collector. The Shopify web pixel runs in a SANDBOX and
+  // sends an opaque/null Origin that is never your store domain, so any origin
+  // allowlist silently blocks the POST: the preflight returns 204 with no
+  // Allow-Origin, and the browser cancels the POST (it never reaches Vercel).
+  // Reflect whatever origin shows up instead.
+  const origin = req.headers.origin || '*';
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Max-Age', '86400');
 }
 
 module.exports = async (req, res) => {
