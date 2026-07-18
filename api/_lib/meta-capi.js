@@ -73,6 +73,9 @@ async function sendEvent(e) {
     clearTimeout(timer);
   }
   const json = await res.json().catch(() => ({}));
+  // Temporary diagnostic: set CAPI_DEBUG=1 in Vercel to log Meta's exact reply.
+  // Success looks like {events_received:1,...}; problems show the error here.
+  if (process.env.CAPI_DEBUG) console.log('[capi]', res.status, JSON.stringify(json));
   if (!res.ok) throw new Error(`CAPI ${res.status}: ${JSON.stringify(json)}`);
   return json;
 }
