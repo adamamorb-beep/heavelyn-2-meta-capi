@@ -1,0 +1,7 @@
+{
+  "name": "meta-capi-vercel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Meta Pixel + Conversions API relay for Shopify, deployed on Vercel",
+  "engines": { "node": ">=18" }
+}
